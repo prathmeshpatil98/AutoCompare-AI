@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*~
+.env
+venv/
+.env.*
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+build/
+.next/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+
+# Coverage
+coverage/
+*.cover
+
+# Docker
+*.docker
+
+# IDE
+.idea/
+
+# Env
+env/
+backend\.env
+
+# Distribution
+dist/
+build/
+
+# Caches
+*.cache
+
+# others

@@ -1,0 +1,9 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.1
+pydantic>=2.12.0
+pydantic-settings>=2.12.0
+elasticsearch[async]>=8.12.0
+redis>=5.0.1
+openai>=1.13.3
+playwright>=1.42.0
+celery>=5.3.6
