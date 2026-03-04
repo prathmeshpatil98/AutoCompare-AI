@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import asyncio
 from openai import AsyncOpenAI
 from app.core.config import settings
 from app.domain.schemas.search import ParsedQuery
@@ -101,15 +102,66 @@ def _apply_regex_fallback(query: str, parsed: ParsedQuery) -> ParsedQuery:
 
     return parsed
 
-async def parse_natural_language_query(query: str) -> ParsedQuery:
+async def parse_natural_language_query(query: str, use_ai: bool = True) -> ParsedQuery:
     """
-    Parses a natural language query using ONLY rule-based regex patterns.
-    No AI/LLM call to avoid timeouts. Fast and reliable fallback.
+    Parses a natural language query using AI (Groq) with regex fallback.
+    If AI fails or times out, falls back to regex-based parsing.
+    
+    Args:
+        query: Natural language query string
+        use_ai: Whether to attempt AI parsing (default: True)
+    
+    Returns:
+        ParsedQuery with extracted fields
     """
     parsed_result = ParsedQuery()
     
-    # Apply rule-based fallback immediately (skip AI entirely to avoid hangs)
-    parsed_result = _apply_regex_fallback(query, parsed_result)
+    # Try AI first if enabled
+    if use_ai:
+        try:
+            logger.info(f"Attempting AI parsing via Groq for query: {query}")
+            response = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model="mixtral-8x7b-32768",
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": query}
+                    ],
+                    temperature=0.1,
+                    max_tokens=200,
+                ),
+                timeout=5.0
+            )
+            
+            response_text = response.choices[0].message.content
+            parsed_json = json.loads(response_text)
+            
+            # Convert to ParsedQuery
+            parsed_result = ParsedQuery(
+                brand=parsed_json.get("brand"),
+                model=parsed_json.get("model"),
+                price_min=parsed_json.get("price_min"),
+                price_max=parsed_json.get("price_max"),
+                location=parsed_json.get("location"),
+                fuel_type=parsed_json.get("fuel_type"),
+                transmission=parsed_json.get("transmission"),
+                body_type=parsed_json.get("body_type"),
+                condition=parsed_json.get("condition"),
+            )
+            
+            logger.info(f"AI parsing successful: {parsed_result}")
+            return parsed_result
+            
+        except asyncio.TimeoutError:
+            logger.warning("AI parsing timed out, falling back to regex")
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse AI response as JSON: {e}, falling back to regex")
+        except Exception as e:
+            logger.warning(f"AI parsing failed: {e}, falling back to regex")
     
+    # Fallback to regex-based parsing
+    logger.info("Using regex-based parsing")
+    parsed_result = _apply_regex_fallback(query, parsed_result)
     logger.info(f"Parsed query via regex rules: {parsed_result}")
+    
     return parsed_result
